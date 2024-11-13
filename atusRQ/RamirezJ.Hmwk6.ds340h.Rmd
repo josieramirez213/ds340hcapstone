@@ -18,7 +18,7 @@ getwd()
 #setwd("C:/Users/Ramirez/OneDrive/Desktop/Cla$$/Fall '24/ds340h/atusRQ")
 #C:\Users\Ramirez\OneDrive\Desktop\ds340hcapstone\atusRQ
 
-setwd("C:/Users/Ramirez/OneDrive/Desktop/ds340hcapstone/atusRQ")
+#setwd("C:/Users/Ramirez/OneDrive/Desktop/ds340hcapstone/atusRQ")
 
 # act<-read.csv("atusact_2023.dat",header=TRUE)
 # cpus<- read.csv("atuscps_2023.dat", header = TRUE)

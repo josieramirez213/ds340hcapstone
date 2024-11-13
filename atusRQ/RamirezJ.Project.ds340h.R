@@ -1,0 +1,581 @@
+#Josie Ramirez
+#DS 340
+
+
+## Downloading Data
+
+#Focusing on getting the needed variables for one year, 2023. Once I am able to do one year, I can do the same for the other seven years
+
+
+getwd()
+#setwd("C:/Users/Ramirez/OneDrive/Desktop/Cla$$/Fall '24/ds340h/atusRQ")
+#C:\Users\Ramirez\OneDrive\Desktop\ds340hcapstone\atusRQ
+
+setwd("C:/Users/Ramirez/OneDrive/Desktop/ds340hcapstone/atusRQ")
+
+# act<-read.csv("atusact_2023.dat",header=TRUE)
+# cpus<- read.csv("atuscps_2023.dat", header = TRUE)
+# 
+# head(act)
+# head(cpus)
+
+
+
+## Working with Activity 2023
+
+library(tidyverse) #trying to use tidyverse rather than r [] syntax
+
+#install.packages("lubridate")
+#install.packages("hms")
+#library(lubridate)
+library(hms)
+#library(ggplot2) #already loaded with tidyverse
+
+
+
+
+#loading in all the data sets--------------------------------- 
+
+act23<-read.csv("atusact_2023.dat",header=TRUE)
+act22<-read.csv("atusact_2022.dat",header=TRUE)
+act21<-read.csv("atusact_2021.dat",header=TRUE)
+act20<-read.csv("atusact_2020.dat",header=TRUE)
+act19<-read.csv("atusact_2019.dat",header=TRUE)
+act18<-read.csv("atusact_2018.dat",header=TRUE)
+act17<-read.csv("atusact_2017.dat",header=TRUE)
+act16<-read.csv("atusact_2016.dat",header=TRUE)
+
+
+
+#making them into a list
+myList = list()
+myList[["df1"]] <- act23
+myList[["df2"]] <- act22
+myList[["df3"]] <- act21
+myList[["df4"]] <- act20
+myList[["df5"]] <- act19
+myList[["df6"]] <- act18
+myList[["df7"]] <- act17
+myList[["df8"]] <- act16
+
+#print(names(myList))
+
+#lapply(myList, head)
+
+#loop through every element in that list
+y = 2023
+
+dfList = list()
+
+
+#--------------------------------- 
+# Creating Function to merge calculate total time for all 8 years
+#---------------------------------- 
+for (i in myList){
+  actY<- i %>%
+    mutate(total_mins = as.numeric(difftime(as_hms(TUSTOPTIME), as_hms(TUSTARTTIM), units = "mins")) ) %>%
+    mutate(year = y)
+  
+  ##Taking only the columns I want
+  
+  newActY<- actY %>%
+    filter((TUTIER1CODE == 3 | TUTIER1CODE == 4) &
+             (TUTIER2CODE == 1 | TUTIER2CODE == 2 | TUTIER2CODE == 3)
+    ) %>%
+    select(TUCASEID, TUACTIVITY_N, TUSTARTTIM, TUSTOPTIME, TUTIER1CODE, TUTIER2CODE, TUTIER3CODE, total_mins, year)
+  
+  dfList[[paste0("year", y)]] <- newActY
+  #myList[[as.character(y)]] <- newActY
+  
+  
+  y<- y-1
+}
+
+print(names(dfList))
+
+lapply(dfList, head)
+
+
+#--------------------------------- 
+# Merging all the datasets, rbind
+
+
+full_df<- rbind(dfList[["year2023"]], dfList[["year2022"]], 
+                dfList[["year2021"]], dfList[["year2020"]], 
+                dfList[["year2019"]], dfList[["year2018"]], 
+                dfList[["year2017"]], dfList[["year2016"]])
+
+head(full_df)
+tail(full_df)
+dim(full_df)
+
+
+#--------------------------------- 
+## Total Time for Household and NonHousehold Children
+
+
+time<- full_df %>%
+  group_by(TUTIER1CODE) %>%
+  summarise(mean_time = mean(total_mins), sum_mins = sum(total_mins), sum_hr = sum(total_mins)/60)
+time
+
+
+#--------------------------------- 
+## Household Children: Total Time Spent by Tier2Code
+
+
+timeHH_type<- full_df %>%
+  filter(TUTIER1CODE==3)%>%
+  group_by(TUTIER2CODE) %>%
+  summarise(mean_time = mean(total_mins), sum_mins = sum(total_mins), sum_hr = sum(total_mins)/60)
+
+timeHH_type
+
+
+#--------------------------------- 
+## NonHousehold Children: Total Time Spent by Tier2Code
+
+timeNH_type<- full_df %>%
+  filter(TUTIER1CODE==4)%>%
+  group_by(TUTIER2CODE) %>%
+  summarise(mean_time = mean(total_mins), sum_mins = sum(total_mins), sum_hr = sum(total_mins)/60)
+
+timeNH_type
+
+
+#--------------------------------- 
+## Visual showing difference between total time spent between household and nonhousehold children
+
+full_df
+
+
+ggplot(full_df, aes(x = factor(TUTIER1CODE), y = total_mins)) +
+  geom_violin(trim = FALSE) +
+  labs(x = "Children", y = "Total Time Spent with Child", title = paste("In the past 8 years, total time spent caring for and helping","\nhousehold and nonhousehold children, capped at 250")) + theme_minimal() +
+  scale_x_discrete(labels = c("Household Children", "Nonhousehold Children")) +  # Custom labels +
+  
+  # Add mean and median
+  stat_summary(aes(color = "Mean"), fun = mean, geom = "point",size = 1) +  
+  stat_summary(aes(color = "Median"), fun = median, geom = "point", size = 1) +
+  
+  scale_color_manual(values = c("Mean" = "blue", "Median" = "yellow")) +  # Custom colors for legend
+  guides(color = guide_legend(title = NULL))  +
+  
+  scale_y_continuous(limits = c(0, 250), breaks = seq(0, 650, by = 50)) +
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+#maybe would want to zoom in more
+#the x-axis could be better
+
+
+
+
+
+#Trying to Merge Activity with Income
+
+head(full_df)
+colnames(full_df)
+dim(full_df)
+#67039     
+
+#reading in cpus
+#loading in all the data sets--------------------------------- 
+
+cpus23<-read.csv("atuscps_2023.dat",header=TRUE)
+colnames(cpus23)
+#PTDTRACE, PESEX
+cpus22<-read.csv("atuscps_2022.dat",header=TRUE)
+cpus21<-read.csv("atuscps_2021.dat",header=TRUE)
+cpus20<-read.csv("atuscps_2020.dat",header=TRUE)
+cpus19<-read.csv("atuscps_2019.dat",header=TRUE)
+cpus18<-read.csv("atuscps_2018.dat",header=TRUE)
+cpus17<-read.csv("atuscps_2017.dat",header=TRUE)
+cpus16<-read.csv("atuscps_2016.dat",header=TRUE)
+
+
+
+#making them into a list
+myList2 = list()
+myList2[["df1"]] <- cpus23
+myList2[["df2"]] <- cpus22
+myList2[["df3"]] <- cpus21
+myList2[["df4"]] <- cpus20
+myList2[["df5"]] <- cpus19
+myList2[["df6"]] <- cpus18
+myList2[["df7"]] <- cpus17
+myList2[["df8"]] <- cpus16
+
+print(names(myList2))
+
+#lapply(myList, head)
+
+#loop through every element in that list
+y = 2023
+
+dfList2 = list()
+
+
+#--------------------------------- 
+# Creating Function to select desired columns from each cps file 
+#---------------------------------- 
+for (i in myList2){
+  
+  cpsY<- i %>%
+    mutate(year = y) %>% 
+    filter(TULINENO==1) %>%
+    #1 bcus that is the respondent whose activity info we have 
+    select(TUCASEID, HEFAMINC, PRCITSHP, PEMARITL, PRTAGE, PTDTRACE, PESEX)
+    ##Taking only the columns I want
+  
+  
+  dfList2[[paste0("year", y)]] <- cpsY
+  #myList[[as.character(y)]] <- newActY
+  
+  
+  y<- y-1
+}
+
+print(names(dfList2))
+
+lapply(dfList2, head)
+
+
+#--------------------------------- 
+# Merging all the cpus data, rbind
+
+
+cps_df2<- rbind(dfList2[["year2023"]], dfList2[["year2022"]], 
+                dfList2[["year2021"]], dfList2[["year2020"]], 
+                dfList2[["year2019"]], dfList2[["year2018"]], 
+                dfList2[["year2017"]], dfList2[["year2016"]])
+
+head(cps_df2)
+tail(cps_df2)
+dim(cps_df2)
+
+#--------------------------------- 
+#Trying to Merge Activity with Income
+
+head(full_df)
+colnames(full_df)
+dim(full_df)
+
+
+#for all those in full i want to add
+merged_act_c<- full_df %>%
+  left_join(select(cps_df2, TUCASEID, HEFAMINC, PRCITSHP, PEMARITL, PRTAGE, PTDTRACE, PESEX), by = "TUCASEID")
+
+head(merged_act_c)
+tail(merged_act_c)
+dim(merged_act_c)
+
+
+
+
+
+#reading in resp
+#loading in all the data sets--------------------------------- 
+
+resp23<-read.csv("atusresp_2023.dat",header=TRUE)
+colnames(resp23)
+#TUDIARYDAY , TELFS , TRCHILDNUM, TRNUMHOU
+#TUDIARYDAY
+resp22<-read.csv("atusresp_2022.dat",header=TRUE)
+resp21<-read.csv("atusresp_2021.dat",header=TRUE)
+resp20<-read.csv("atusresp_2020.dat",header=TRUE)
+resp19<-read.csv("atusresp_2019.dat",header=TRUE)
+resp18<-read.csv("atusresp_2018.dat",header=TRUE)
+resp17<-read.csv("atusresp_2017.dat",header=TRUE)
+resp16<-read.csv("atusresp_2016.dat",header=TRUE)
+
+
+
+#making them into a list
+myList3 = list()
+myList3[["df1"]] <- resp23
+myList3[["df2"]] <- resp22
+myList3[["df3"]] <- resp21
+myList3[["df4"]] <- resp20
+myList3[["df5"]] <- resp19
+myList3[["df6"]] <- resp18
+myList3[["df7"]] <- resp17
+myList3[["df8"]] <- resp16
+
+print(names(myList3))
+
+
+#loop through every element in that list
+y = 2023
+
+dfList3 = list()
+
+
+#--------------------------------- 
+# Creating Function to select desired columns from each cps file 
+#---------------------------------- 
+for (i in myList3){
+  
+  respY<- i %>%
+    mutate(year = y) %>% 
+    filter(TULINENO==1) %>%
+    #1 bcus that is the respondent whose activity info we have 
+    select(TUCASEID, TUDIARYDAY, TELFS, TRCHILDNUM, TRNUMHOU)
+    #TUDIARYDAY
+  ##Taking only the columns I want
+  
+  
+  dfList3[[paste0("year", y)]] <- respY
+  #myList[[as.character(y)]] <- newActY
+  
+  
+  y<- y-1
+}
+
+print(names(dfList3))
+
+lapply(dfList3, head)
+
+
+#--------------------------------- 
+# Merging all the cpus data, rbind
+
+
+resp_Df<- rbind(dfList3[["year2023"]], dfList3[["year2022"]], 
+                dfList3[["year2021"]], dfList3[["year2020"]], 
+                dfList3[["year2019"]], dfList3[["year2018"]], 
+                dfList3[["year2017"]], dfList3[["year2016"]])
+
+head(resp_Df)
+tail(resp_Df)
+#dim(resp_Df)
+
+#--------------------------------- 
+#Trying to Merge Act and CPS with Resp Variables 
+
+head(merged_act_c)
+colnames(merged_act_c)
+dim(merged_act_c)
+
+
+#for all those in full i want to add
+fullMerge<- merged_act_c %>%
+  left_join(select(resp_Df, TUCASEID, TUDIARYDAY, TELFS, TRCHILDNUM, TRNUMHOU), by = "TUCASEID")
+  #TUDIARYDAY
+
+head(fullMerge)
+tail(fullMerge)
+dim(fullMerge)
+colnames(fullMerge)
+#67039    
+
+
+
+#--------------------------------- 
+#--------------------------------- 
+#--------------------------------- 
+#Left off here
+
+
+#mean of federal poverty guidelines 
+
+#same for 48 states, plus Alaska and Hawaii
+one_p<- c(12798, 15990, 14721)
+two_p<- c(17290, 21609, 19888)
+three_p<- c(21783, 27228, 25054)
+four_p<- c(26275,32846, 30220)
+five_p<- c(30768,98465,35386)
+six_p<- c(35260,44084, 40553)
+seven_p<- c(39754,49703,45719)
+eight_p<- c(44249, 55324, 50888)
+more_p<- c(4373, 5621, 5166)
+
+meanOne<- mean(one_p)
+meanTwo<- mean(two_p)
+meanThree<- mean(three_p)
+meanFour<- mean(four_p)
+meanFive<- mean(five_p)
+meanSix<- mean(six_p)
+meanSeven<- mean(seven_p)
+meanEight<- mean(eight_p)
+meanMore<- mean(more_p)
+
+
+
+head(fullMerge)
+
+#predefined poverty guidelines
+povertyG<- data.frame(
+  houseSize = 1:9,
+  guide = c(meanOne,meanTwo,meanThree, meanFour, meanFive, meanSix, meanSeven, meanEight, meanMore)
+)
+povertyG
+povertyG[9,2]
+#povertyG[9,2] +100
+
+#income nums for coded income variable
+income <- c(5000, 7499, 9999, 12499, 14999, 19999, 24999, 29999, 34999, 39999, 
+            49999, 59999, 74999, 99999, 149999, 150000)
+#giving col name basically 
+names(income) <- 1:16
+income
+
+fullMerge$poverty<- NA
+head(fullMerge)
+
+for (i in 1:nrow(fullMerge)){
+  #print(df[i, ])
+  
+  #getting income and household size for one row 
+  earning<- income[fullMerge$HEFAMINC[i]] #variable goes to 
+  #print(earning)
+  houseSize<- fullMerge$TRNUMHOU[i]
+  
+  #if house size 1-8, then we have predefined threshold
+  if (houseSize <= 8){
+    povGuide<- povertyG$guide[povertyG$houseSize == houseSize]
+  }
+  #if greater than 8, then we need to calculate threshold
+  else{
+    last<- povertyG$guide[povertyG$houseSize == 8]
+    povGuide<- last + (houseSize - 8) * povertyG[9,2]
+    
+  }
+  
+  if (earning < povGuide){
+    fullMerge$poverty[i] <- 1 #below poverty line
+  }
+  else{
+    fullMerge$poverty[i] <- 0 #above poverty line 
+  }
+
+}
+
+head(fullMerge)
+tail(fullMerge)
+dim(fullMerge)
+
+u <- unique(fullMerge$poverty)
+print(u) #okay so 1 is there, just got nervous from head and tail
+
+
+potentialNA <- anyNA(fullMerge)
+potentialNA
+#seems like there are no NA's 
+#so know I can start analysis 
+summary(fullMerge)
+
+
+
+
+
+
+#############
+# code I'm not using anymore 
+#############
+
+act<-read.csv("atusact_2023.dat",header=TRUE)
+cpus<- read.csv("atuscps_2023.dat", header = TRUE)
+
+r<- read.csv("atusresp_2023.dat", header = TRUE)
+newR<- r %>%
+  select(TUCASEID, TRNUMHOU)
+head(newR)
+# 
+head(act)
+head(cpus)
+
+
+#variables wanted: TUCASEID, TESEX, TUACTIVITY_N, TUSTARTTIM, TUSTOPTIME, TUTIER1CODE, TUTIER2CODE, TUTIER3CODE
+
+newAct<- act %>%
+  filter((TUTIER1CODE == 03 | TUTIER1CODE == 04) &
+           (TUTIER2CODE == 1 | TUTIER2CODE == 2 | TUTIER2CODE == 3)
+  ) %>%
+  select(TUCASEID, TUACTIVITY_N, TUSTARTTIM, TUSTOPTIME, TUTIER1CODE, TUTIER2CODE, TUTIER3CODE)
+
+# #TESEX not in activity would need to see another file
+# 
+head(newAct)
+head(cpus)
+
+
+#i want to add the income variable for all tucaseid in newAct, other values drop
+
+mergedDf<- newAct %>%
+  left_join(select(cpus, TUCASEID, HEFAMINC), by = "TUCASEID")
+
+head(mergedDf)
+tail(mergedDf)
+
+new_mergedDf<- mergedDf %>%
+  left_join(select(newR, TUCASEID, TRNUMHOU), by = "TUCASEID")
+
+head(new_mergedDf)
+tail(new_mergedDf)
+
+
+#realized i also need the total respondents to be able to calculate the federal measurement code
+
+
+# grouped23<- newAct %>%
+#   group_by(TUTIER1CODE) %>%
+#   summarise(mean_time = mean(total_mins), sum_mins = sum(total_mins), sum_hr = sum(total_mins)/60)
+# grouped23
+
+
+# grouped23_type<- newAct %>%
+#   filter(TUTIER1CODE==3)%>%
+#   group_by(TUTIER2CODE) %>%
+#   summarise(mean_time = mean(total_mins), sum_mins = sum(total_mins), sum_hr = sum(total_mins)/60)
+# 
+# grouped23_type
+
+
+## Focusing on getting total time for Household Children
+
+# class(newAct$TUSTARTTIM)
+# #need to convert start and stop times 
+# 
+#
+# 
+# hh <- newAct[newAct$TUTIER1CODE == 3, ]
+# dim(hh)
+# #these indicate specifically household children care
+# 
+# hh<- hh %>%
+#   mutate(total_mins = as.numeric(difftime(as_hms(TUSTOPTIME), as_hms(TUSTARTTIM), units = "mins")) )
+# 
+# dim(hh)
+# head(hh)
+# 
+# 
+# ## For household children, this is the total amount of time spent
+# 
+# minsBy2Code <- aggregate(total_mins ~ TUTIER2CODE, data = hh, FUN = sum)
+# minsBy2Code
+# 
+# 
+# 
+# ## Focusing on getting total time for Non Household Children
+# 
+# nonhh <- newAct[newAct$TUTIER1CODE == 4, ]
+# dim(hh)
+# #these indicate specifically household children care
+# 
+# nonhh<- nonhh %>%
+#   mutate(total_mins = as.numeric(difftime(as_hms(TUSTOPTIME), as_hms(TUSTARTTIM), units = "mins")) )
+# 
+# head(nonhh)
+# dim(nonhh)
+# 
+# minsBy2Code <- aggregate(total_mins ~ TUTIER2CODE, data = nonhh, FUN = sum)
+# minsBy2Code
+# 
+# ## Combing datasets so info is all in one
+# act23 <- merge(hh, nonhh, by = "TUCASEID", all = FALSE)
+# head(act23)
+# tail(act23)
+# #not really sure
+# #-------------ask
+
