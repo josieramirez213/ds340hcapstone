@@ -27,7 +27,7 @@ library(tidyverse) #trying to use tidyverse rather than r [] syntax
 
 #install.packages("lubridate")
 #install.packages("hms")
-#library(lubridate)
+library(lubridate)
 library(hms)
 #library(ggplot2) #already loaded with tidyverse
 
@@ -73,7 +73,29 @@ dfList = list()
 #---------------------------------- 
 for (i in myList){
   actY<- i %>%
-    mutate(total_mins = as.numeric(difftime(as_hms(TUSTOPTIME), as_hms(TUSTARTTIM), units = "mins")) ) %>%
+    mutate(
+      #total_mins = ifelse(
+        #as_hms(TUSTOPTIME) < as_hms(TUSTARTTIM),  # Stop time is earlier (spanning midnight)
+        #as.numeric(difftime(as_hms(TUSTOPTIME) + hours(24), as_hms(TUSTARTTIM), units = "mins")),  # Add 24 hours to stop time
+        #as.numeric(difftime(as_hms(TUSTOPTIME), as_hms(TUSTARTTIM), units = "mins"))  # Normal case (no midnight span)
+      #)
+    #) %>%
+      TUSTOPTIME = as_hms(TUSTOPTIME),
+      TUSTARTTIM = as_hms(TUSTARTTIM),
+      
+      # Convert to numeric seconds to avoid errors with hms arithmetic
+      TUSTOPTIME_sec = as.numeric(TUSTOPTIME),
+      TUSTARTTIM_sec = as.numeric(TUSTARTTIM),
+      
+      # Calculate total_mins, handling midnight crossing manually
+      total_mins = ifelse(
+        TUSTOPTIME_sec < TUSTARTTIM_sec,  # If stop time is earlier (spanning midnight)
+        (TUSTOPTIME_sec + 86400 - TUSTARTTIM_sec) / 60,  # Add 86400 seconds (24 hours) to stop time
+        (TUSTOPTIME_sec - TUSTARTTIM_sec) / 60  # Normal case (no midnight span)
+      )
+    ) %>%
+    
+    #mutate(total_mins = as.numeric(difftime(as_hms(TUSTOPTIME), as_hms(TUSTARTTIM), units = "mins")) ) %>%
     mutate(year = y)
   
   ##Taking only the columns I want
@@ -109,6 +131,12 @@ head(full_df)
 tail(full_df)
 dim(full_df)
 
+range(full_df$total_mins)
+#from 1 min to almost 24 hours
+
+
+#invalid_rows <- full_df[as_hms(full_df$TUSTARTTIM) > as_hms(full_df$TUSTOPTIME), ]
+#print(invalid_rows)
 
 #--------------------------------- 
 ## Total Time for Household and NonHousehold Children
@@ -147,6 +175,7 @@ timeNH_type
 ## Visual showing difference between total time spent between household and nonhousehold children
 
 full_df
+head(full_df)
 
 
 ggplot(full_df, aes(x = factor(TUTIER1CODE), y = total_mins)) +
@@ -161,12 +190,30 @@ ggplot(full_df, aes(x = factor(TUTIER1CODE), y = total_mins)) +
   scale_color_manual(values = c("Mean" = "blue", "Median" = "yellow")) +  # Custom colors for legend
   guides(color = guide_legend(title = NULL))  +
   
-  scale_y_continuous(limits = c(0, 250), breaks = seq(0, 650, by = 50)) +
+  #scale_y_continuous(limits = c(0, 250), breaks = seq(0, 650, by = 50)) +
   theme(plot.title = element_text(hjust = 0.5))
 
+anyNA(full_df$total_mins)
+#says false, meaning there not
+#-------------------------------------------------------------------------------------------------
+jpeg("time_w_hh_nhh.jpg", width = 8, height = 6, units = "in", res = 300)
 
-#maybe would want to zoom in more
-#the x-axis could be better
+ggplot(full_df, aes(x = factor(TUTIER1CODE), y = log(total_mins))) +
+  geom_violin(trim = FALSE) +
+  labs(x = "Children", y = "Total Time Spent with Child", title = paste("In the past 8 years, logged total time spent caring for and helping","\nhousehold and nonhousehold children")) + theme_minimal() +
+  scale_x_discrete(labels = c("Household Children", "Nonhousehold Children")) +  # Custom labels +
+  
+  # Add mean and median
+  stat_summary(aes(color = "Mean"), fun = mean, geom = "point",size = 1) +  
+  stat_summary(aes(color = "Median"), fun = median, geom = "point", size = 1) +
+  
+  scale_color_manual(values = c("Mean" = "blue", "Median" = "yellow")) +  # Custom colors for legend
+  guides(color = guide_legend(title = NULL))  +
+  
+  theme(plot.title = element_text(hjust = 0.5))
+
+dev.off()
+
 
 
 
@@ -239,7 +286,6 @@ for (i in myList2){
 print(names(dfList2))
 
 lapply(dfList2, head)
-
 
 #--------------------------------- 
 # Merging all the cpus data, rbind
@@ -371,10 +417,6 @@ colnames(fullMerge)
 
 
 
-#--------------------------------- 
-#--------------------------------- 
-#--------------------------------- 
-#Left off here
 
 
 #mean of federal poverty guidelines 
@@ -466,53 +508,157 @@ potentialNA
 summary(fullMerge)
 
 
+#------------------------------------------------#------------------------------------------------#------------------------------------------------
+#running linear models 
+
+range(fullMerge$total_mins)
+
+df_predict1<- fullMerge %>%
+  select(-c(TUCASEID,TUACTIVITY_N, TUSTARTTIM, TUSTOPTIME, TUTIER1CODE, TUTIER2CODE, TUTIER3CODE))
+head(df_predict1)
+
+set.seed(13)
+train_rows<- sample(nrow(df_predict1), size = 0.8 *nrow(df_predict1))
+
+test<- df_predict1[-train_rows, ]
+head(test)
+dim(test)
+train<- df_predict1[train_rows, ]
+head(train)
+dim(train)
+
+#okay now i have train and test data
+
+#fitting linear regression model with all cols as predictors
+m1<- lm(total_mins ~ . , data = train)
+summary(m1)
+
+predict1<- predict(m1, newdata = test)
+
+rmse1<- sqrt(mean((test$total_mins - predict1)^2))
+print(paste("Model 1 RMSE: ", rmse1))
+
+
+#includes main effects and interactions, pairwise
+m2<- lm(total_mins ~ .^2 , data = train)
+summary(m2)
+
+predict2<- predict(m2, newdata = test)
+
+rmse2<- sqrt(mean((test$total_mins - predict2)^2))
+print(paste("Model 2 RMSE: ", rmse2))
 
 
 
+
+
+df_predict2<- fullMerge %>%
+  select(-c(TUCASEID,TUACTIVITY_N, TUSTARTTIM, TUSTOPTIME, TUTIER1CODE, TUTIER2CODE, TUTIER3CODE, poverty))
+head(df_predict2)
+
+set.seed(333)
+train_rows2<- sample(nrow(df_predict2), size = 0.8 *nrow(df_predict2))
+
+test2<- df_predict2[-train_rows2, ]
+head(test2)
+dim(test2)
+train2<- df_predict2[train_rows2, ]
+head(train2)
+dim(train2)
+
+m3<- lm(total_mins ~ . , data = train2)
+summary(m3)
+
+predict3<- predict(m3, newdata = test2)
+
+rmse3<- sqrt(mean((test2$total_mins - predict3)^2))
+print(paste("Model 3 RMSE: ", rmse3))
+
+
+#includes main effects and interactions, pairwise
+m4<- lm(total_mins ~ .^2 , data = train2)
+summary(m4)
+
+predict4<- predict(m4, newdata = test2)
+
+rmse4<- sqrt(mean((test2$total_mins - predict4)^2))
+print(paste("Model 4 RMSE: ", rmse4))
+
+
+#--------------------------------- 
+#--------------------------------- 
+#--------------------------------- 
+#Left off here
+
+#------------------------------------------------
+#graphic of how many respondents
+
+barplot(table(fullMerge$poverty))
+
+
+jpeg("respo_poverty_status.jpg", width = 8, height = 6, units = "in", res = 300)
+
+ggplot(fullMerge, aes(x = factor(poverty))) +
+  geom_bar(stat = "count") +
+  labs(x = "Poverty Status", y = "Number of Respondents", title = paste("Number of Respondents Below and Above Federal Poverty Guidelines")) + theme_minimal() +
+  scale_x_discrete(labels = c("Above Poverty Guideline", "Below Poverty Guideline")) +  # Custom labels +
+  
+  # Add mean and median
+  #stat_summary(aes(color = "Mean"), fun = mean, geom = "point",size = 1) +  
+  #stat_summary(aes(color = "Median"), fun = median, geom = "point", size = 1) +
+  
+  #scale_color_manual(values = c("Mean" = "blue", "Median" = "yellow")) +  # Custom colors for legend
+  #guides(color = guide_legend(title = NULL))  +
+  theme_minimal()+
+  theme(plot.title = element_text(hjust = 0.5))+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())+
+  geom_text(stat = "count", aes(label = ..count..), vjust = -0.2, size = 5)
+
+dev.off()
 
 #############
 # code I'm not using anymore 
 #############
 
-act<-read.csv("atusact_2023.dat",header=TRUE)
-cpus<- read.csv("atuscps_2023.dat", header = TRUE)
-
-r<- read.csv("atusresp_2023.dat", header = TRUE)
-newR<- r %>%
-  select(TUCASEID, TRNUMHOU)
-head(newR)
+# act<-read.csv("atusact_2023.dat",header=TRUE)
+# cpus<- read.csv("atuscps_2023.dat", header = TRUE)
 # 
-head(act)
-head(cpus)
-
-
-#variables wanted: TUCASEID, TESEX, TUACTIVITY_N, TUSTARTTIM, TUSTOPTIME, TUTIER1CODE, TUTIER2CODE, TUTIER3CODE
-
-newAct<- act %>%
-  filter((TUTIER1CODE == 03 | TUTIER1CODE == 04) &
-           (TUTIER2CODE == 1 | TUTIER2CODE == 2 | TUTIER2CODE == 3)
-  ) %>%
-  select(TUCASEID, TUACTIVITY_N, TUSTARTTIM, TUSTOPTIME, TUTIER1CODE, TUTIER2CODE, TUTIER3CODE)
-
-# #TESEX not in activity would need to see another file
+# r<- read.csv("atusresp_2023.dat", header = TRUE)
+# newR<- r %>%
+#   select(TUCASEID, TRNUMHOU)
+# head(newR)
+# # 
+# head(act)
+# head(cpus)
 # 
-head(newAct)
-head(cpus)
-
-
-#i want to add the income variable for all tucaseid in newAct, other values drop
-
-mergedDf<- newAct %>%
-  left_join(select(cpus, TUCASEID, HEFAMINC), by = "TUCASEID")
-
-head(mergedDf)
-tail(mergedDf)
-
-new_mergedDf<- mergedDf %>%
-  left_join(select(newR, TUCASEID, TRNUMHOU), by = "TUCASEID")
-
-head(new_mergedDf)
-tail(new_mergedDf)
+# 
+# #variables wanted: TUCASEID, TESEX, TUACTIVITY_N, TUSTARTTIM, TUSTOPTIME, TUTIER1CODE, TUTIER2CODE, TUTIER3CODE
+# 
+# newAct<- act %>%
+#   filter((TUTIER1CODE == 03 | TUTIER1CODE == 04) &
+#            (TUTIER2CODE == 1 | TUTIER2CODE == 2 | TUTIER2CODE == 3)
+#   ) %>%
+#   select(TUCASEID, TUACTIVITY_N, TUSTARTTIM, TUSTOPTIME, TUTIER1CODE, TUTIER2CODE, TUTIER3CODE)
+# 
+# # #TESEX not in activity would need to see another file
+# # 
+# head(newAct)
+# head(cpus)
+# 
+# 
+# #i want to add the income variable for all tucaseid in newAct, other values drop
+# 
+# mergedDf<- newAct %>%
+#   left_join(select(cpus, TUCASEID, HEFAMINC), by = "TUCASEID")
+# 
+# head(mergedDf)
+# tail(mergedDf)
+# 
+# new_mergedDf<- mergedDf %>%
+#   left_join(select(newR, TUCASEID, TRNUMHOU), by = "TUCASEID")
+# 
+# head(new_mergedDf)
+# tail(new_mergedDf)
 
 
 #realized i also need the total respondents to be able to calculate the federal measurement code
