@@ -130,89 +130,111 @@ full_df<- rbind(dfList[["year2023"]], dfList[["year2022"]],
 head(full_df)
 tail(full_df)
 dim(full_df)
-
+range(full_df$TUTIER2CODE)
 range(full_df$total_mins)
 #from 1 min to almost 24 hours
 
+#if tucaseid is the same and 1code is 3 and 2code is 1, 2, 3, i want to add total_mins_hh
+# 1code is 4 and 2code is 1, 2, 3, i want to add total_mins_nhh
+# after that i can do total for each row and add them together
+
+# full_df2<- full_df %>%
+#   group_by(TUCASEID, TUTIER1CODE) %>%
+#   summarise(total_mins2 = sum(total_mins))
+# 
+# head(full_df2)
+# tail(full_df2)
+# dim(full_df2)
+anyNA((full_df$TUTIER1CODE))
+full_df2<- full_df %>%
+  group_by(TUCASEID, year) %>%
+  summarize(
+    
+    hh_totalmins = sum(total_mins[TUTIER1CODE ==3]),
+    
+    nhh_totalmins = sum(total_mins[TUTIER1CODE ==4]),
+    .groups = "drop"
+  )
+head(full_df2)
+full_df2<- as.data.frame(full_df2)
+head(full_df2)
+range(full_df2$nhh_totalmins)
+range(full_df2$hh_totalmins)
+range(full_df2$year)
+
+dim(full_df2)
+#18061, 4
+length(unique((full_df2$TUCASEID))) #18061
 
 #invalid_rows <- full_df[as_hms(full_df$TUSTARTTIM) > as_hms(full_df$TUSTOPTIME), ]
 #print(invalid_rows)
 
-#--------------------------------- 
+#--------------------------------- will possibly return to later--------------------------------- 
 ## Total Time for Household and NonHousehold Children
-
-
-time<- full_df %>%
-  group_by(TUTIER1CODE) %>%
-  summarise(mean_time = mean(total_mins), sum_mins = sum(total_mins), sum_hr = sum(total_mins)/60)
-time
-
-
-#--------------------------------- 
-## Household Children: Total Time Spent by Tier2Code
-
-
-timeHH_type<- full_df %>%
-  filter(TUTIER1CODE==3)%>%
-  group_by(TUTIER2CODE) %>%
-  summarise(mean_time = mean(total_mins), sum_mins = sum(total_mins), sum_hr = sum(total_mins)/60)
-
-timeHH_type
-
-
-#--------------------------------- 
-## NonHousehold Children: Total Time Spent by Tier2Code
-
-timeNH_type<- full_df %>%
-  filter(TUTIER1CODE==4)%>%
-  group_by(TUTIER2CODE) %>%
-  summarise(mean_time = mean(total_mins), sum_mins = sum(total_mins), sum_hr = sum(total_mins)/60)
-
-timeNH_type
+# time<- full_df %>%
+#   group_by(TUTIER1CODE) %>%
+#   summarise(mean_time = mean(total_mins), sum_mins = sum(total_mins), sum_hr = sum(total_mins)/60)
+# time
+# #--------------------------------- 
+# ## Household Children: Total Time Spent by Tier2Code
+# timeHH_type<- full_df %>%
+#   filter(TUTIER1CODE==3)%>%
+#   group_by(TUTIER2CODE) %>%
+#   summarise(mean_time = mean(total_mins), sum_mins = sum(total_mins), sum_hr = sum(total_mins)/60)
+# 
+# timeHH_type
+# #--------------------------------- 
+# ## NonHousehold Children: Total Time Spent by Tier2Code
+# 
+# timeNH_type<- full_df %>%
+#   filter(TUTIER1CODE==4)%>%
+#   group_by(TUTIER2CODE) %>%
+#   summarise(mean_time = mean(total_mins), sum_mins = sum(total_mins), sum_hr = sum(total_mins)/60)
+# 
+# timeNH_type
 
 
 #--------------------------------- 
 ## Visual showing difference between total time spent between household and nonhousehold children
 
-full_df
-head(full_df)
+#
+head(full_df2)
 
-
-ggplot(full_df, aes(x = factor(TUTIER1CODE), y = total_mins)) +
-  geom_violin(trim = FALSE) +
-  labs(x = "Children", y = "Total Time Spent with Child", title = paste("In the past 8 years, total time spent caring for and helping","\nhousehold and nonhousehold children, capped at 250")) + theme_minimal() +
-  scale_x_discrete(labels = c("Household Children", "Nonhousehold Children")) +  # Custom labels +
-  
-  # Add mean and median
-  stat_summary(aes(color = "Mean"), fun = mean, geom = "point",size = 1) +  
-  stat_summary(aes(color = "Median"), fun = median, geom = "point", size = 1) +
-  
-  scale_color_manual(values = c("Mean" = "blue", "Median" = "yellow")) +  # Custom colors for legend
-  guides(color = guide_legend(title = NULL))  +
-  
-  #scale_y_continuous(limits = c(0, 250), breaks = seq(0, 650, by = 50)) +
-  theme(plot.title = element_text(hjust = 0.5))
+# ggplot(full_df, aes(x = factor(TUTIER1CODE), y = total_mins)) +
+#   geom_violin(trim = FALSE) +
+#   labs(x = "Children", y = "Total Time Spent with Child", title = paste("In the past 8 years, total time spent caring for and helping","\nhousehold and nonhousehold children, capped at 250")) + theme_minimal() +
+#   scale_x_discrete(labels = c("Household Children", "Nonhousehold Children")) +  # Custom labels +
+#   
+#   # Add mean and median
+#   stat_summary(aes(color = "Mean"), fun = mean, geom = "point",size = 1) +  
+#   stat_summary(aes(color = "Median"), fun = median, geom = "point", size = 1) +
+#   
+#   scale_color_manual(values = c("Mean" = "blue", "Median" = "yellow")) +  # Custom colors for legend
+#   guides(color = guide_legend(title = NULL))  +
+#   
+#   #scale_y_continuous(limits = c(0, 250), breaks = seq(0, 650, by = 50)) +
+#   theme(plot.title = element_text(hjust = 0.5))
 
 anyNA(full_df$total_mins)
 #says false, meaning there not
 #-------------------------------------------------------------------------------------------------
-jpeg("time_w_hh_nhh.jpg", width = 8, height = 6, units = "in", res = 300)
-
-ggplot(full_df, aes(x = factor(TUTIER1CODE), y = log(total_mins))) +
-  geom_violin(trim = FALSE) +
-  labs(x = "Children", y = "Total Time Spent with Child", title = paste("In the past 8 years, logged total time spent caring for and helping","\nhousehold and nonhousehold children")) + theme_minimal() +
-  scale_x_discrete(labels = c("Household Children", "Nonhousehold Children")) +  # Custom labels +
-  
-  # Add mean and median
-  stat_summary(aes(color = "Mean"), fun = mean, geom = "point",size = 1) +  
-  stat_summary(aes(color = "Median"), fun = median, geom = "point", size = 1) +
-  
-  scale_color_manual(values = c("Mean" = "blue", "Median" = "yellow")) +  # Custom colors for legend
-  guides(color = guide_legend(title = NULL))  +
-  
-  theme(plot.title = element_text(hjust = 0.5))
-
-dev.off()
+# jpeg("time_w_hh_nhh.jpg", width = 8, height = 6, units = "in", res = 300)
+# 
+# ggplot(full_df, aes(x = factor(TUTIER1CODE), y = log(total_mins))) +
+#   geom_violin(trim = FALSE) +
+#   labs(x = "Children", y = "Total Time Spent with Child", title = paste("In the past 8 years, logged total time spent caring for and helping","\nhousehold and nonhousehold children")) + theme_minimal() +
+#   scale_x_discrete(labels = c("Household Children", "Nonhousehold Children")) +  # Custom labels +
+#   
+#   # Add mean and median
+#   stat_summary(aes(color = "Mean"), fun = mean, geom = "point",size = 1) +  
+#   stat_summary(aes(color = "Median"), fun = median, geom = "point", size = 1) +
+#   
+#   scale_color_manual(values = c("Mean" = "blue", "Median" = "yellow")) +  # Custom colors for legend
+#   guides(color = guide_legend(title = NULL))  +
+#   
+#   theme(plot.title = element_text(hjust = 0.5))
+# 
+# dev.off()
 
 
 
@@ -224,7 +246,18 @@ dev.off()
 head(full_df)
 colnames(full_df)
 dim(full_df)
-#67039     
+#67039   
+
+head(full_df2)
+colnames(full_df2)
+dim(full_df2) #18061 4
+
+full_df2$total<- full_df2$hh_totalmins + full_df2$nhh_totalmins
+head(full_df2)
+tail(full_df2)
+colnames(full_df2)
+dim(full_df2) #18061 5
+
 
 #reading in cpus
 #loading in all the data sets--------------------------------- 
@@ -307,16 +340,19 @@ head(full_df)
 colnames(full_df)
 dim(full_df)
 
+head(full_df2)
+colnames(full_df2)
+dim(full_df2)
 
 #for all those in full i want to add
-merged_act_c<- full_df %>%
+merged_act_c<- full_df2 %>%
   left_join(select(cps_df2, TUCASEID, HEFAMINC, PRCITSHP, PEMARITL, PRTAGE, PTDTRACE, PESEX), by = "TUCASEID")
 
 head(merged_act_c)
 tail(merged_act_c)
 dim(merged_act_c)
 
-
+anyNA(merged_act_c)
 
 
 
@@ -413,7 +449,7 @@ head(fullMerge)
 tail(fullMerge)
 dim(fullMerge)
 colnames(fullMerge)
-#67039    
+#18061    
 
 
 
@@ -445,7 +481,7 @@ meanMore<- mean(more_p)
 
 
 head(fullMerge)
-
+dim(fullMerge)
 #predefined poverty guidelines
 povertyG<- data.frame(
   houseSize = 1:9,
@@ -496,6 +532,7 @@ for (i in 1:nrow(fullMerge)){
 head(fullMerge)
 tail(fullMerge)
 dim(fullMerge)
+#18061
 
 u <- unique(fullMerge$poverty)
 print(u) #okay so 1 is there, just got nervous from head and tail
@@ -510,11 +547,11 @@ summary(fullMerge)
 
 #------------------------------------------------#------------------------------------------------#------------------------------------------------
 #running linear models 
-
-range(fullMerge$total_mins)
+colnames(fullMerge)
+range(fullMerge$total) #30 hours and 5 minutes
 
 df_predict1<- fullMerge %>%
-  select(-c(TUCASEID,TUACTIVITY_N, TUSTARTTIM, TUSTOPTIME, TUTIER1CODE, TUTIER2CODE, TUTIER3CODE))
+  select(-c(TUCASEID, hh_totalmins, nhh_totalmins))
 head(df_predict1)
 
 set.seed(13)
@@ -530,22 +567,22 @@ dim(train)
 #okay now i have train and test data
 
 #fitting linear regression model with all cols as predictors
-m1<- lm(total_mins ~ . , data = train)
+m1<- lm(log(total) ~ . , data = train)
 summary(m1)
 
 predict1<- predict(m1, newdata = test)
 
-rmse1<- sqrt(mean((test$total_mins - predict1)^2))
+rmse1<- sqrt(mean((log(test$total) - predict1)^2))
 print(paste("Model 1 RMSE: ", rmse1))
 
 
 #includes main effects and interactions, pairwise
-m2<- lm(total_mins ~ .^2 , data = train)
+m2<- lm(log(total) ~ .^2 , data = train)
 summary(m2)
 
 predict2<- predict(m2, newdata = test)
 
-rmse2<- sqrt(mean((test$total_mins - predict2)^2))
+rmse2<- sqrt(mean((log(test$total) - predict2)^2))
 print(paste("Model 2 RMSE: ", rmse2))
 
 
@@ -553,7 +590,7 @@ print(paste("Model 2 RMSE: ", rmse2))
 
 
 df_predict2<- fullMerge %>%
-  select(-c(TUCASEID,TUACTIVITY_N, TUSTARTTIM, TUSTOPTIME, TUTIER1CODE, TUTIER2CODE, TUTIER3CODE, poverty))
+  select(-c(TUCASEID, hh_totalmins, nhh_totalmins, poverty))
 head(df_predict2)
 
 set.seed(333)
@@ -566,22 +603,22 @@ train2<- df_predict2[train_rows2, ]
 head(train2)
 dim(train2)
 
-m3<- lm(total_mins ~ . , data = train2)
+m3<- lm(log(total) ~ . , data = train2)
 summary(m3)
 
 predict3<- predict(m3, newdata = test2)
 
-rmse3<- sqrt(mean((test2$total_mins - predict3)^2))
+rmse3<- sqrt(mean((log(test2$total) - predict3)^2))
 print(paste("Model 3 RMSE: ", rmse3))
 
 
 #includes main effects and interactions, pairwise
-m4<- lm(total_mins ~ .^2 , data = train2)
+m4<- lm(log(total) ~ .^2 , data = train2)
 summary(m4)
 
 predict4<- predict(m4, newdata = test2)
 
-rmse4<- sqrt(mean((test2$total_mins - predict4)^2))
+rmse4<- sqrt(mean((log(test2$total) - predict4)^2))
 print(paste("Model 4 RMSE: ", rmse4))
 
 
@@ -593,7 +630,31 @@ print(paste("Model 4 RMSE: ", rmse4))
 #------------------------------------------------
 #graphic of how many respondents
 
-barplot(table(fullMerge$poverty))
+head(fullMerge)
+boxplot(log(fullMerge$total)~fullMerge$poverty )
+#main result, make it cute
+jpeg("time_by_poverty.jpg", width =8, height = 6, units = "in", res = 300)
+
+ggplot(fullMerge, aes(x = factor(poverty), y = log(total))) +
+  geom_violin(trim = FALSE) +
+  labs(x = "Poverty Status", y = "Total Time Spent with Child", title = paste("In the past 8 years, logged total time spent caring for and helping \nby federal poverty guideline"))+
+  scale_x_discrete(labels = c("Above Poverty Guideline", "Below Poverty Guideline")) +  # Custom labels +
+
+  
+  
+  # Add mean and median
+  stat_summary(aes(color = "Mean"), fun = mean, geom = "point",size = 1) +
+  stat_summary(aes(color = "Median"), fun = median, geom = "point", size = 1) +
+
+  scale_color_manual(values = c("Mean" = "blue", "Median" = "yellow")) +  # Custom colors for legend
+  guides(color = guide_legend(title = NULL))  +
+
+  theme(plot.title = element_text(hjust = 0.5))
+
+dev.off()
+
+
+#barplot(table(fullMerge$poverty))
 
 
 jpeg("respo_poverty_status.jpg", width = 8, height = 6, units = "in", res = 300)
@@ -615,6 +676,25 @@ ggplot(fullMerge, aes(x = factor(poverty))) +
   geom_text(stat = "count", aes(label = ..count..), vjust = -0.2, size = 5)
 
 dev.off()
+
+
+
+#--------------------------------- 
+#--------------------------------- 
+#--------------------------------- 
+#Left off here
+
+
+
+
+
+
+
+
+
+
+
+
 
 #############
 # code I'm not using anymore 
