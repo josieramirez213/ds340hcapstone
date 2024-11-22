@@ -621,6 +621,8 @@ predict4<- predict(m4, newdata = test2)
 rmse4<- sqrt(mean((log(test2$total) - predict4)^2))
 print(paste("Model 4 RMSE: ", rmse4))
 
+anova(m2, m4)
+
 
 #--------------------------------- 
 #--------------------------------- 
@@ -637,7 +639,7 @@ jpeg("time_by_poverty.jpg", width =8, height = 6, units = "in", res = 300)
 
 ggplot(fullMerge, aes(x = factor(poverty), y = log(total))) +
   geom_violin(trim = FALSE) +
-  labs(x = "Poverty Status", y = "Total Time Spent with Child", title = paste("In the past 8 years, logged total time spent caring for and helping \nby federal poverty guideline"))+
+  labs(x = "Poverty Status", y = "Total Time Spent with Children", title = paste("In the past 8 years, logged total time spent with children \nby federal poverty guideline"))+
   scale_x_discrete(labels = c("Above Poverty Guideline", "Below Poverty Guideline")) +  # Custom labels +
 
   
