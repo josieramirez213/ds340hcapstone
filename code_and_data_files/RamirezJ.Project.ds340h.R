@@ -11,7 +11,7 @@ getwd()
 #setwd("C:/Users/Ramirez/OneDrive/Desktop/Cla$$/Fall '24/ds340h/atusRQ")
 #C:\Users\Ramirez\OneDrive\Desktop\ds340hcapstone\atusRQ
 
-setwd("C:/Users/Ramirez/OneDrive/Desktop/ds340hcapstone/atusRQ")
+setwd("C:/Users/Ramirez/OneDrive/Desktop/ds340hcapstone/code_and_data_files")
 
 # act<-read.csv("atusact_2023.dat",header=TRUE)
 # cpus<- read.csv("atuscps_2023.dat", header = TRUE)
@@ -547,12 +547,58 @@ summary(fullMerge)
 
 #------------------------------------------------#------------------------------------------------#------------------------------------------------
 #running linear models 
+head(fullMerge)
 colnames(fullMerge)
+dim(fullMerge)
+length(unique(fullMerge$TUCASEID))
 range(fullMerge$total) #30 hours and 5 minutes
+
+
+
+#manipulating race col
+#non-white is 0 and white is 1 
+fullMerge$PTDTRACE[fullMerge$PTDTRACE != "1"] <- "0"
+fullMerge$PTDTRACE[is.na(fullMerge$PTDTRACE)] <- "0"
+unique(fullMerge$PTDTRACE)
+
+
+
+#checking categorical and continuous vars
+class(fullMerge$HEFAMINC)
+fullMerge$HEFAMINC<- factor(fullMerge$HEFAMINC)
+fullMerge$PRCITSHP <- factor(fullMerge$PRCITSHP )
+fullMerge$PEMARITL <- factor(fullMerge$PEMARITL )
+fullMerge$PTDTRACE <- factor(fullMerge$PTDTRACE )
+fullMerge$PESEX<- factor(fullMerge$PESEX)
+fullMerge$TUDIARYDAY <- factor(fullMerge$TUDIARYDAY )
+fullMerge$TELFS <- factor(fullMerge$TELFS )
+fullMerge$poverty<- factor(fullMerge$poverty)
+
+
+#i want all these to be factors, not numerical 
+class(fullMerge$HEFAMINC)
+class(fullMerge$PRCITSHP)
+class(fullMerge$PEMARITL)
+class(fullMerge$PTDTRACE)
+class(fullMerge$PESEX)
+class(fullMerge$TUDIARYDAY)
+class(fullMerge$TELFS)
+class(fullMerge$poverty)
+
+levels(fullMerge$PTDTRACE)
+
+head(fullMerge)
+summary(fullMerge)
+
+
+
 
 df_predict1<- fullMerge %>%
   select(-c(TUCASEID, hh_totalmins, nhh_totalmins))
+
 head(df_predict1)
+class(df_predict1$TELFS)
+
 
 set.seed(13)
 train_rows<- sample(nrow(df_predict1), size = 0.8 *nrow(df_predict1))
@@ -560,10 +606,11 @@ train_rows<- sample(nrow(df_predict1), size = 0.8 *nrow(df_predict1))
 test<- df_predict1[-train_rows, ]
 head(test)
 dim(test)
+levels(test$PTDTRACE)
+
 train<- df_predict1[train_rows, ]
 head(train)
 dim(train)
-
 #okay now i have train and test data
 
 #fitting linear regression model with all cols as predictors
@@ -572,18 +619,58 @@ summary(m1)
 
 predict1<- predict(m1, newdata = test)
 
+
+rmseTrain<- sqrt(mean((m1$residuals)^2))
+print(paste("Model pair RMSE train: ", rmseTrain))
 rmse1<- sqrt(mean((log(test$total) - predict1)^2))
 print(paste("Model 1 RMSE: ", rmse1))
+bic1<- BIC(m1)
+print(paste("Model 1 BIC: ", bic1))
 
 
-#includes main effects and interactions, pairwise
-m2<- lm(log(total) ~ .^2 , data = train)
+
+#.^2
+#poverty*.
+#includes main effects and interactions, 
+m2<- lm(log(total) ~ . + poverty:PEMARITL + poverty:PRTAGE + poverty:PESEX + poverty:TRCHILDNUM + poverty:TRNUMHOU , data = train)
 summary(m2)
 
 predict2<- predict(m2, newdata = test)
 
+
+rmseTrain2<- sqrt(mean((m2$residuals)^2))
+print(paste("Model pair RMSE train: ", rmseTrain2))
 rmse2<- sqrt(mean((log(test$total) - predict2)^2))
 print(paste("Model 2 RMSE: ", rmse2))
+bic2<- BIC(m2)
+print(paste("Model 2 BIC: ", bic2))
+#------------------------------------------------#------------------------------------------------#------------------------------------------------
+#this is the model i have decided is best, so I will now use 
+#entire dataset to re train model and predict to get a fitted value
+#and i will use this outcome for my anova analysis 
+
+df_predict1
+final_model_poverty<- lm(log(total) ~ . + poverty:PEMARITL + poverty:PRTAGE + poverty:PESEX + poverty:TRCHILDNUM + poverty:TRNUMHOU , data = df_predict1)
+summary(final_model_poverty)
+
+
+
+
+
+###
+m_pair<- lm(log(total) ~ .^2 , data = train)
+summary(m_pair)
+
+predict_pair<- predict(m_pair, newdata = test)
+
+rmseTrain_pair<- sqrt(mean((m_pair$residuals)^2))
+print(paste("Model pair RMSE train: ", rmseTrain_pair))
+rmse_pair<- sqrt(mean((log(test$total) - predict_pair)^2))
+print(paste("Model pair RMSE test: ", rmse_pair))
+bic_pair<- BIC(m_pair)
+print(paste("Model pair BIC: ", bic_pair))
+
+
 
 
 
@@ -592,6 +679,198 @@ print(paste("Model 2 RMSE: ", rmse2))
 df_predict2<- fullMerge %>%
   select(-c(TUCASEID, hh_totalmins, nhh_totalmins, poverty))
 head(df_predict2)
+
+final_model_poverty<- lm(log(total) ~ . + poverty:PEMARITL + poverty:PRTAGE + poverty:PESEX + poverty:TRCHILDNUM + poverty:TRNUMHOU , data = df_predict1)
+summary(final_model_poverty)
+
+final_model_NOpoverty<- lm(log(total) ~. , data = df_predict2)
+summary(final_model_NOpoverty)
+
+bic_no<- BIC(final_model_NOpoverty)
+print(paste("Model pair BIC: ", bic_no))
+
+
+
+anova(final_model_poverty, final_model_NOpoverty)
+
+
+
+
+#------------------------------------------------
+#graphic of how many respondents
+
+head(fullMerge)
+boxplot(log(fullMerge$total)~fullMerge$poverty )
+#main result, make it cute
+jpeg("time_by_poverty.jpg", width =8, height = 6, units = "in", res = 300)
+
+ggplot(fullMerge, aes(x = factor(poverty), y = log(total))) +
+  geom_violin(trim = FALSE) +
+  labs(x = "Poverty Status", y = "Logged Total Time Spent with Children", title = paste("In the past 8 years, logged total time spent with children \nby federal poverty guideline"))+
+  scale_x_discrete(labels = c("Above Poverty Guideline", "Below Poverty Guideline")) +  # Custom labels +
+
+  
+  
+  # Add mean and median
+  stat_summary(fun = mean, geom = "point",size = 1, color = "darkgreen", shape = 16) +
+  stat_summary(fun = mean, geom = "text", size = 4, 
+               vjust = 1.5, aes(label = round(..y.., 2)), color = "darkgreen") +
+  
+  stat_summary(fun = median, geom = "point", size = 1,color = "deeppink4", shape = 17) +
+
+  scale_color_manual(name = "Summary Statistics", values = c("Mean" = "darkgreen", "Median" = "deeppink4"), labels = c("Mean", "Median")) +
+  scale_shape_manual(name = "Summary Statistics", values = c("Mean" = 16, "Median" = 17), labels = c("Mean", "Median"))  +
+                     #breaks = c("Mean", "Median")) +  # Custom colors for legend
+  
+  guides(color = guide_legend(title = "Summary Statistics"),
+         shape = guide_legend(title = "Summary Statistics"))  +
+
+  theme(plot.title = element_text(hjust = 0.5))
+
+dev.off()
+
+######################################################
+jpeg("fitted_povertyModel.jpg", width = 8, height = 6, units = "in", res = 300)
+
+
+
+df_fitted_resid <- data.frame(Fitted = final_model_poverty$fitted.values, Residuals = final_model_poverty$residuals)
+
+# Plot with ggplot2
+ggplot(df_fitted_resid, aes(x = Fitted, y = Residuals)) +
+  geom_point(shape = 1, alpha = 0.5, color = "palegreen") +
+  geom_hline(yintercept = 0, color = "black") +
+  labs(title = "Residuals vs. Fitted Values Plot for Model 2, including poverty",
+       x = "Fitted Values", y = "Residuals") +
+  theme_minimal()+
+  theme(plot.title = element_text(hjust = 0.5))
+
+dev.off()
+
+######################################################
+jpeg("fitted_NOpovertyModel.jpg", width = 8, height = 6, units = "in", res = 300)
+
+
+
+df_fitted_resid <- data.frame(Fitted = final_model_NOpoverty$fitted.values, Residuals = final_model_NOpoverty$residuals)
+
+# Plot with ggplot2
+ggplot(df_fitted_resid, aes(x = Fitted, y = Residuals)) +
+  geom_point(shape = 1, alpha = 0.5, color = "sandybrown") +
+  geom_hline(yintercept = 0, color = "black") +
+  labs(title = "Residuals vs. Fitted Values Plot for Model 4, excluding poverty",
+       x = "Fitted Values", y = "Residuals") +
+  theme_minimal()+
+  theme(plot.title = element_text(hjust = 0.5))
+
+dev.off()
+
+
+######################################################
+
+jpeg("respo_poverty_status.jpg", width = 10, height = 4.5, units = "in", res = 300)
+
+ggplot(fullMerge, aes(x = factor(poverty))) +
+  geom_bar(stat = "count") +
+  labs(x = "Poverty Status", y = "Number of Respondents", title = paste("Number of Respondents Below and Above Federal Poverty Guidelines")) + theme_minimal() +
+  scale_x_discrete(labels = c("Above Poverty Guideline", "Below Poverty Guideline")) +  # Custom labels +
+  
+  # Add mean and median
+  #stat_summary(aes(color = "Mean"), fun = mean, geom = "point",size = 1) +  
+  #stat_summary(aes(color = "Median"), fun = median, geom = "point", size = 1) +
+  
+  #scale_color_manual(values = c("Mean" = "blue", "Median" = "yellow")) +  # Custom colors for legend
+  #guides(color = guide_legend(title = NULL))  +
+  theme_minimal()+
+  theme(plot.title = element_text(hjust = 0.5))+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())+
+  geom_text(stat = "count", aes(label = ..count..), vjust = -0.2, size = 5)
+
+dev.off()
+
+######################################################
+
+jpeg("interactions.jpg", width = 10, height = 6, units = "in", res = 300)
+
+fullMerge$poverty <- factor(fullMerge$poverty, levels = c(1, 0), labels = c("Below Poverty", "Above Poverty"))
+
+
+ggplot(fullMerge, aes(x = interaction(poverty, PEMARITL), y = log(total), fill = PEMARITL)) +
+  geom_boxplot() +
+  labs(x = "Poverty and Marital Status", 
+       y = "Logged Total Time Spent with Children", 
+       title = "Interaction between Poverty and Marital Status on Time Spent with Children") +
+  scale_x_discrete(labels = c("Below Poverty\nMarried", "Above Poverty\nMarried", 
+                              "Below Poverty\nMarried,\nspouse absent", "Above Poverty\nMarried,\nspouse absent",
+                              "Below Poverty\nWidowed", "Above Poverty\nWidowed",
+                             "Below Poverty\nDivorced", "Above Poverty\nDivored",
+                             "Below Poverty\nSeparated", "Above Poverty\nSeparated",
+                             "Below Poverty\nNever Married", "Above Poverty\nNever Married")) +
+  #scale_fill_manual(values = c("skyblue", "salmon", "orange")) +
+  theme_minimal()+
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+
+
+dev.off()
+
+
+#--------------------------------- 
+#--------------------------------- 
+#--------------------------------- 
+#Left off here
+dim(fullMerge)
+colnames(fullMerge)
+range(fullMerge$hh_totalmins)
+sum(fullMerge$nhh_totalmins==0)
+range(fullMerge$nhh_totalmins)
+
+
+jpeg("poverty_childtype.jpg", width = 8, height = 6, units = "in", res = 300)
+
+
+fullMerge_long <- fullMerge %>%
+  pivot_longer(cols = c(hh_totalmins, nhh_totalmins), 
+               names_to = "child_time_type", 
+               values_to = "child_time")
+
+
+ggplot(fullMerge_long, aes(x = factor(poverty), y = log(child_time + 1), fill = child_time_type)) +
+    geom_violin(trim = FALSE, alpha = 0.6) +
+  
+  stat_summary(fun = "mean", geom = "text", aes(label = round(..y.., 1)), 
+               position = position_dodge(width = 1.25), size = 4, vjust = 2.70, color = "black") +
+  
+  scale_fill_manual(values = c("mediumpurple1", "lightpink2"), 
+                    labels = c("Household Children", "Nonhousehold Children")) +  # Customize legend labels
+  
+  labs(x = "Poverty Status", 
+       y = "Logged Time Spent with Children", 
+       title = "Time Spent with Children by Poverty Status and Type of Time") +
+  
+  scale_x_discrete(labels = c("0" = "Above Poverty Guideline", "1" = "Below Poverty Guideline")) + 
+  
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5),  
+        legend.title = element_blank(), 
+        legend.position = "top")  
+
+dev.off()
+
+
+
+
+
+
+
+
+
+
+
+#############
+# code I'm not using anymore 
+#############
 
 set.seed(333)
 train_rows2<- sample(nrow(df_predict2), size = 0.8 *nrow(df_predict2))
@@ -621,86 +900,19 @@ predict4<- predict(m4, newdata = test2)
 rmse4<- sqrt(mean((log(test2$total) - predict4)^2))
 print(paste("Model 4 RMSE: ", rmse4))
 
-anova(m2, m4)
-
-
-#--------------------------------- 
-#--------------------------------- 
-#--------------------------------- 
-#Left off here
-
-#------------------------------------------------
-#graphic of how many respondents
-
-head(fullMerge)
-boxplot(log(fullMerge$total)~fullMerge$poverty )
-#main result, make it cute
-jpeg("time_by_poverty.jpg", width =8, height = 6, units = "in", res = 300)
-
-ggplot(fullMerge, aes(x = factor(poverty), y = log(total))) +
-  geom_violin(trim = FALSE) +
-  labs(x = "Poverty Status", y = "Total Time Spent with Children", title = paste("In the past 8 years, logged total time spent with children \nby federal poverty guideline"))+
-  scale_x_discrete(labels = c("Above Poverty Guideline", "Below Poverty Guideline")) +  # Custom labels +
-
-  
-  
-  # Add mean and median
-  stat_summary(aes(color = "Mean"), fun = mean, geom = "point",size = 1) +
-  stat_summary(aes(color = "Median"), fun = median, geom = "point", size = 1) +
-
-  scale_color_manual(values = c("Mean" = "blue", "Median" = "yellow")) +  # Custom colors for legend
-  guides(color = guide_legend(title = NULL))  +
-
-  theme(plot.title = element_text(hjust = 0.5))
-
-dev.off()
-
-
-#barplot(table(fullMerge$poverty))
-
-
-jpeg("respo_poverty_status.jpg", width = 8, height = 6, units = "in", res = 300)
-
-ggplot(fullMerge, aes(x = factor(poverty))) +
-  geom_bar(stat = "count") +
-  labs(x = "Poverty Status", y = "Number of Respondents", title = paste("Number of Respondents Below and Above Federal Poverty Guidelines")) + theme_minimal() +
-  scale_x_discrete(labels = c("Above Poverty Guideline", "Below Poverty Guideline")) +  # Custom labels +
-  
-  # Add mean and median
-  #stat_summary(aes(color = "Mean"), fun = mean, geom = "point",size = 1) +  
-  #stat_summary(aes(color = "Median"), fun = median, geom = "point", size = 1) +
-  
-  #scale_color_manual(values = c("Mean" = "blue", "Median" = "yellow")) +  # Custom colors for legend
-  #guides(color = guide_legend(title = NULL))  +
-  theme_minimal()+
-  theme(plot.title = element_text(hjust = 0.5))+
-  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())+
-  geom_text(stat = "count", aes(label = ..count..), vjust = -0.2, size = 5)
-
-dev.off()
 
 
 
-#--------------------------------- 
-#--------------------------------- 
-#--------------------------------- 
-#Left off here
+levels(train$PTDTRACE)
 
+#keep getting an error with race so trying to ensure factors are the same
+# train$PTDTRACE<- factor(train$PTDTRACE)
+# class(train$PTDTRACE)
+# levels(train$PTDTRACE)
 
-
-
-
-
-
-
-
-
-
-
-
-#############
-# code I'm not using anymore 
-#############
+# test$PTDTRACE<- factor(test$PTDTRACE, levels = levels(train$PTDTRACE))
+# class(test$PTDTRACE)
+# levels(test$PTDTRACE)
 
 # act<-read.csv("atusact_2023.dat",header=TRUE)
 # cpus<- read.csv("atuscps_2023.dat", header = TRUE)
@@ -806,4 +1018,28 @@ dev.off()
 # tail(act23)
 # #not really sure
 # #-------------ask
+
+
+
+ggplot(fullMerge, aes(x = factor(poverty), y = log(total))) +
+  geom_violin(trim = FALSE) +
+  labs(x = "Poverty Status", y = "Logged Total Time Spent with Children", title = paste("In the past 8 years, logged total time spent with children \nby federal poverty guideline"))+
+  scale_x_discrete(labels = c("Above Poverty Guideline", "Below Poverty Guideline")) +  # Custom labels +
+  
+  
+  
+  # Add mean and median
+  stat_summary(fun = mean, geom = "point",size = 1, aes(color = "Mean", shape = "Mean")) +
+  stat_summary(fun = mean, geom = "text", size = 4, 
+               vjust = 1.5, aes(label = round(..y.., 2), color = "Mean")) +
+  
+  stat_summary(fun = median, geom = "point", size = 1,  aes(color = "Median", shape = "Median")) +
+  
+  scale_color_manual(values = c("Mean" = "darkgreen", "Median" = "deeppink4")) +
+  scale_shape_manual(values = c("Mean" = 16, "Median" = 16)) +
+  #breaks = c("Mean", "Median")) +  # Custom colors for legend
+  guides(color = guide_legend(title = "Summary Statistics"),
+         shape = guide_legend(title = "Summary Statistics"))  +
+  
+  theme(plot.title = element_text(hjust = 0.5))
 
